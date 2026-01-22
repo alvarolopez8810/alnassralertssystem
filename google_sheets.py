@@ -56,10 +56,12 @@ def get_google_sheets_client():
         raise Exception(f"Error connecting to Google Sheets: {str(e)}")
 
 
+@st.cache_data(ttl=300)
 def leer_todas_las_pestanas():
     """
     Lee todas las pestañas del Google Sheet y las devuelve como un diccionario de DataFrames
     Similar a pd.ExcelFile pero para Google Sheets
+    Cache de 5 minutos para mejorar rendimiento
     
     Returns:
         dict: {nombre_pestaña: DataFrame}

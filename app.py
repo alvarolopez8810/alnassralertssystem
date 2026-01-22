@@ -169,25 +169,44 @@ if uploaded_file is not None:
             
             st.success(f"✅ {total_jugadores} players extracted from PDF")
             
-            with st.spinner("🔍 Searching for highlighted players in Google Sheets..."):
-                sheets_data = leer_todas_las_pestanas()
-                jugadores_encontrados = buscar_coincidencias_en_todas_pestanas(
-                    df_jugadores, 
-                    sheets_data
-                )
+            status_placeholder = st.empty()
+            status_placeholder.info("📊 Loading Google Sheets database...")
+            sheets_data = leer_todas_las_pestanas()
+            
+            status_placeholder.info("🔍 Searching for highlighted players...")
+            jugadores_encontrados = buscar_coincidencias_en_todas_pestanas(
+                df_jugadores, 
+                sheets_data
+            )
+            status_placeholder.empty()
             
             if len(jugadores_encontrados) == 0:
                 st.info("ℹ️ No highlighted players found in this lineup")
             else:
-                st.warning(f"🔔 {len(jugadores_encontrados)} highlighted players found!")
+                st.success("✅ Processing completed!")
                 
-                alertas_enviadas = 0
+                col1, col2 = st.columns(2)
+                col1.metric("📊 Players Analyzed", total_jugadores)
+                col2.metric("⚽ Highlighted Players", len(jugadores_encontrados))
+                
+                st.divider()
+                st.header("⚽ HIGHLIGHTED PLAYERS")
+                
+                for jugador in jugadores_encontrados:
+                    mostrar_jugador_destacado(jugador, False)
+                
+                st.divider()
                 
                 if not modo_prueba:
-                    with st.spinner("📧 Sending email alerts..."):
+                    st.warning(f"🔔 {len(jugadores_encontrados)} highlighted players found!")
+                    
+                    if st.button("📧 Send Email Alerts", type="primary", use_container_width=True):
+                        alertas_enviadas = 0
                         progress_bar = st.progress(0)
+                        status_text = st.empty()
                         
                         for i, jugador in enumerate(jugadores_encontrados):
+                            status_text.info(f"📧 Sending email {i+1}/{len(jugadores_encontrados)}: {jugador['Nombre']}...")
                             progress_bar.progress((i + 1) / len(jugadores_encontrados))
                             
                             jugador_info = {
@@ -206,41 +225,17 @@ if uploaded_file is not None:
                             }
                             
                             email_enviado = enviar_alerta_jugador(jugador_info)
-                            jugador['email_enviado'] = email_enviado
                             
                             if email_enviado:
                                 alertas_enviadas += 1
                         
                         progress_bar.empty()
+                        status_text.empty()
+                        
+                        st.balloons()
+                        st.success(f"🎉 {alertas_enviadas} alerts sent successfully to {EMAIL_DESTINATARIOS[0]}!")
                 else:
-                    for jugador in jugadores_encontrados:
-                        jugador['email_enviado'] = False
-                    st.info("🧪 Test mode: No emails were sent")
-                
-                st.divider()
-                st.success("✅ Processing completed!")
-                
-                col1, col2, col3 = st.columns(3)
-                col1.metric("📊 Players Analyzed", total_jugadores)
-                col2.metric("⚽ Highlighted Players", len(jugadores_encontrados))
-                
-                if not modo_prueba:
-                    col3.metric("✉️ Alerts Sent", alertas_enviadas)
-                else:
-                    col3.metric("✉️ Alerts Sent", "Test Mode")
-                
-                st.divider()
-                st.header("⚽ HIGHLIGHTED PLAYERS")
-                
-                for jugador in jugadores_encontrados:
-                    mostrar_jugador_destacado(
-                        jugador, 
-                        jugador.get('email_enviado', False)
-                    )
-                
-                if not modo_prueba and alertas_enviadas > 0:
-                    st.balloons()
-                    st.success(f"🎉 Process completed! {alertas_enviadas} alerts sent successfully.")
+                    st.info("🧪 Test mode: Review players above. No emails will be sent.")
         
         except Exception as e:
             st.error(f"❌ Error processing file: {str(e)}")
