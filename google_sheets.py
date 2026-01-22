@@ -3,6 +3,7 @@ from google.oauth2.service_account import Credentials
 import pandas as pd
 import streamlit as st
 import json
+import os
 
 SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets',
@@ -13,14 +14,35 @@ SPREADSHEET_ID = '1HssweG6CwbKejAb6jACCWu9MtYcqakuePXZYlBhxgxg'
 
 def get_google_sheets_client():
     """
-    Conecta con Google Sheets usando las credenciales de Streamlit secrets
+    Conecta con Google Sheets usando credenciales de múltiples fuentes:
+    1. Variables de entorno individuales (Render)
+    2. Streamlit secrets
+    3. Archivo service_account.json local
     """
     try:
-        if hasattr(st, 'secrets') and 'gcp_service_account' in st.secrets:
+        credentials_dict = None
+        
+        if os.getenv('GCP_TYPE'):
+            credentials_dict = {
+                "type": os.getenv('GCP_TYPE'),
+                "project_id": os.getenv('GCP_PROJECT_ID'),
+                "private_key_id": os.getenv('GCP_PRIVATE_KEY_ID'),
+                "private_key": os.getenv('GCP_PRIVATE_KEY'),
+                "client_email": os.getenv('GCP_CLIENT_EMAIL'),
+                "client_id": os.getenv('GCP_CLIENT_ID'),
+                "auth_uri": os.getenv('GCP_AUTH_URI'),
+                "token_uri": os.getenv('GCP_TOKEN_URI'),
+                "auth_provider_x509_cert_url": os.getenv('GCP_AUTH_PROVIDER_X509_CERT_URL'),
+                "client_x509_cert_url": os.getenv('GCP_CLIENT_X509_CERT_URL'),
+                "universe_domain": os.getenv('GCP_UNIVERSE_DOMAIN', 'googleapis.com')
+            }
+        elif hasattr(st, 'secrets') and 'gcp_service_account' in st.secrets:
             credentials_dict = dict(st.secrets['gcp_service_account'])
-        else:
+        elif os.path.exists('service_account.json'):
             with open('service_account.json', 'r') as f:
                 credentials_dict = json.load(f)
+        else:
+            raise Exception("No credentials found. Please configure GCP_* environment variables or Streamlit secrets.")
         
         credentials = Credentials.from_service_account_info(
             credentials_dict,
