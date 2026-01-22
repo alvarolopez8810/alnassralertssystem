@@ -5,10 +5,10 @@ load_dotenv()
 
 EMAIL_USER = os.getenv('EMAIL_USER')
 EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD')
-EMAIL_JEFE = os.getenv('EMAIL_JEFE')
+EMAIL_JEFE = os.getenv('EMAIL_JEFE', 'al.scoutinglab@gmail.com')
+EMAIL_CHIEFSCOUT = os.getenv('EMAIL_CHIEFSCOUT', 'rafitagil@hotmail.com')
 
 EMAIL_DESTINATARIOS = [
-    'al.scoutinglab@gmail.com',
-    'rafitagil1975@gmail.com',
-    'rafitagil@hotmail.com'
+    EMAIL_JEFE,
+    EMAIL_CHIEFSCOUT
 ]
