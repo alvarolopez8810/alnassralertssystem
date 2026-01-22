@@ -1,9 +1,11 @@
 import streamlit as st
 import pandas as pd
 from pdf_parser import extraer_jugadores_pdf, extraer_info_partido
+from saff_api import obtener_jugadores_partido, formatear_jugadores_para_busqueda
 from buscar_coincidencias import buscar_coincidencias_en_todas_pestanas
 from email_alertas import enviar_alerta_jugador
 from google_sheets import leer_todas_las_pestanas, obtener_nombres_pestanas
+from config import EMAIL_DESTINATARIOS
 from PIL import Image
 import os
 import tempfile
@@ -89,10 +91,15 @@ with st.sidebar:
     st.title("Al Nassr FC")
     st.header("📖 Instructions")
     st.markdown("""
-    1. Upload the match lineup PDF
-    2. Click "Process and Send Alerts"
-    3. Review highlighted players
-    4. Alerts are sent automatically via email
+    **Choose your input method:**
+    
+    1. **PDF Upload**: Upload match lineup PDF
+    2. **SAFF+ URL**: Enter match URL or ID
+    
+    Then:
+    - Click "Process and Send Alerts"
+    - Review highlighted players
+    - Send email alerts if needed
     
     ---
     
@@ -128,13 +135,35 @@ with col_title:
 
 st.divider()
 
-st.header("📄 Upload Match Lineup (PDF)")
+st.header("📥 Select Input Method")
 
-uploaded_file = st.file_uploader(
-    "Select the match lineup PDF file",
-    type=['pdf'],
-    help="Upload the official match lineup PDF from MySAFF system"
+input_method = st.radio(
+    "Choose how to input match data:",
+    ["📄 Upload PDF", "🔗 SAFF+ URL/ID"],
+    horizontal=True
 )
+
+st.divider()
+
+uploaded_file = None
+match_input = None
+
+if input_method == "📄 Upload PDF":
+    st.subheader("📄 Upload Match Lineup (PDF)")
+    uploaded_file = st.file_uploader(
+        "Select the match lineup PDF file",
+        type=['pdf'],
+        help="Upload the official match lineup PDF from MySAFF system"
+    )
+else:
+    st.subheader("🔗 Enter SAFF+ Match URL or ID")
+    match_input = st.text_input(
+        "SAFF+ Match URL or ID",
+        placeholder="https://saffplus.sa/match/ABC123 or just ABC123",
+        help="Enter the full URL or just the match ID from SAFF+"
+    )
+    if match_input:
+        st.success(f"✅ Match ID/URL entered: {match_input}")
 
 try:
     with st.spinner("🔄 Connecting to Google Sheets database..."):
@@ -145,27 +174,53 @@ except Exception as e:
     st.info("💡 Make sure the service account credentials are configured in Streamlit secrets")
     st.stop()
 
-if uploaded_file is not None:
-    st.success(f"✅ File uploaded: {uploaded_file.name}")
-    
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
-        tmp_file.write(uploaded_file.getvalue())
-        pdf_temp_path = tmp_file.name
+if uploaded_file is not None or match_input:
+    if uploaded_file:
+        st.success(f"✅ File uploaded: {uploaded_file.name}")
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
+            tmp_file.write(uploaded_file.getvalue())
+            pdf_temp_path = tmp_file.name
     
     st.divider()
     
     if st.button("🔔 PROCESS AND SEND ALERTS", type="primary", use_container_width=True):
         
         try:
-            with st.spinner("⏳ Extracting match information..."):
-                info_partido = extraer_info_partido(pdf_temp_path)
+            if uploaded_file:
+                with st.spinner("⏳ Extracting match information from PDF..."):
+                    info_partido = extraer_info_partido(pdf_temp_path)
+                
+                st.info(f"📋 **Match #{info_partido['ID_Partido']}** - {info_partido['Fecha']} at {info_partido['Hora']}")
+                st.info(f"🏟️ **Stadium:** {info_partido['Estadio']}")
+                
+                with st.spinner("⏳ Processing lineup..."):
+                    df_jugadores = extraer_jugadores_pdf(pdf_temp_path)
+                    total_jugadores = len(df_jugadores)
+                    
+                match_info_display = f"#{info_partido['ID_Partido']} - {info_partido['Fecha']}"
             
-            st.info(f"📋 **Match #{info_partido['ID_Partido']}** - {info_partido['Fecha']} at {info_partido['Hora']}")
-            st.info(f"🏟️ **Stadium:** {info_partido['Estadio']}")
-            
-            with st.spinner("⏳ Processing lineup..."):
-                df_jugadores = extraer_jugadores_pdf(pdf_temp_path)
+            else:
+                with st.spinner("⏳ Fetching match data from SAFF+ API..."):
+                    df_jugadores_saff, info_partido_saff = obtener_jugadores_partido(match_input)
+                
+                if df_jugadores_saff is None or info_partido_saff is None:
+                    st.error("❌ Could not retrieve match data. Please check the URL/ID and try again.")
+                    st.stop()
+                
+                st.success("✅ Match data retrieved from SAFF+!")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.info(f"🏠 **Home:** {info_partido_saff['home_team']}")
+                    st.info(f"✈️ **Away:** {info_partido_saff['away_team']}")
+                with col2:
+                    st.info(f"🏟️ **Venue:** {info_partido_saff['venue']}")
+                    st.info(f"📅 **Date:** {info_partido_saff['start_time'][:10] if len(info_partido_saff['start_time']) > 10 else info_partido_saff['start_time']}")
+                
+                df_jugadores = formatear_jugadores_para_busqueda(df_jugadores_saff)
                 total_jugadores = len(df_jugadores)
+                
+                match_info_display = f"{info_partido_saff['home_team']} vs {info_partido_saff['away_team']} - {info_partido_saff['start_time'][:10]}"
             
             st.success(f"✅ {total_jugadores} players extracted from PDF")
             
@@ -221,7 +276,7 @@ if uploaded_file is not None:
                                 'Nationality': jugador.get('Nationality', 'Not specified'),
                                 'League': jugador.get('League', 'Not specified'),
                                 'Año_Nacimiento': jugador['Año_Nacimiento'],
-                                'Partido': f"#{info_partido['ID_Partido']} - {info_partido['Fecha']}"
+                                'Partido': match_info_display
                             }
                             
                             email_enviado = enviar_alerta_jugador(jugador_info)
@@ -243,33 +298,54 @@ if uploaded_file is not None:
                 st.exception(e)
         
         finally:
-            if os.path.exists(pdf_temp_path):
+            if uploaded_file and os.path.exists(pdf_temp_path):
                 os.unlink(pdf_temp_path)
 
 else:
-    st.info("👆 Please upload a PDF file to start")
+    st.info("👆 Please select an input method and provide match data to start")
     
     with st.expander("ℹ️ How it works"):
         st.markdown("""
         ### System Workflow:
         
-        1. **PDF Upload**: Upload the official match lineup PDF
-        2. **Automatic Extraction**: The system extracts all players from the PDF
-        3. **Database Search**: Searches for matches in `mreportsyouth.xlsx`
-        4. **Matching Criteria**:
-           - Player number (exact match)
-           - Player name (85%+ similarity)
-           - Team name (partial match)
-        5. **Email Alerts**: Sends formatted emails to all recipients
+        **Option 1: PDF Upload**
+        1. Upload the official match lineup PDF
+        2. System extracts all players from the PDF
+        3. Searches for matches in Google Sheets database
+        
+        **Option 2: SAFF+ URL/ID**
+        1. Enter SAFF+ match URL or ID
+        2. System fetches data directly from SAFF+ API
+        3. Searches for matches in Google Sheets database
+        
+        **Matching Criteria:**
+        - Player number (exact match)
+        - Player name (85%+ similarity)
+        - Team name (partial match)
+        
+        **Email Alerts:**
+        - Sends formatted emails to all recipients
+        - Includes player details, performance, and scout decision
         
         ### Email Content:
         - Player name, team, and number
-        - Position (from PDF) and Spec. Position (from database)
+        - Position (generic and specific)
         - Nationality and League
         - Birth year
         - Performance level
         - Scout decision
         - Match information
+        """)
+    
+    with st.expander("🔗 SAFF+ URL Examples"):
+        st.markdown("""
+        ### Valid SAFF+ URLs:
+        - `https://saffplus.sa/match/V92ZUHBHk21ociydW9xhI`
+        - `https://saffplus.sa/event/FXSzaQsIp8v0y6aXcRAwf`
+        
+        ### Or just the ID:
+        - `V92ZUHBHk21ociydW9xhI`
+        - `FXSzaQsIp8v0y6aXcRAwf`
         """)
 
 st.divider()
