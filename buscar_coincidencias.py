@@ -102,23 +102,32 @@ def buscar_jugador_en_excel(jugador_pdf, df_excel):
     return None
 
 
-def buscar_coincidencias_en_todas_pestanas(df_jugadores_pdf, excel_path):
+def buscar_coincidencias_en_todas_pestanas(df_jugadores_pdf, sheets_dict=None):
     """
-    Busca coincidencias en todas las pestañas del Excel
+    Busca coincidencias en todas las pestañas del Google Sheet o Excel
     
     Args:
         df_jugadores_pdf: DataFrame con jugadores del PDF
-        excel_path: ruta al archivo Excel
+        sheets_dict: dict con {nombre_pestaña: DataFrame} o None para usar Excel local
     
     Returns:
         list de dicts con jugadores encontrados y sus datos
     """
     jugadores_encontrados = []
     
-    xls = pd.ExcelFile(excel_path)
+    if sheets_dict is None:
+        excel_path = '/Users/alvarolopezmolina/Desktop/alertasalnassr/mreportsyouth.xlsx'
+        xls = pd.ExcelFile(excel_path)
+        sheet_names = xls.sheet_names
+        def get_sheet(name):
+            return pd.read_excel(excel_path, sheet_name=name)
+    else:
+        sheet_names = sheets_dict.keys()
+        def get_sheet(name):
+            return sheets_dict[name]
     
-    for sheet_name in xls.sheet_names:
-        df_sheet = pd.read_excel(excel_path, sheet_name=sheet_name)
+    for sheet_name in sheet_names:
+        df_sheet = get_sheet(sheet_name)
         
         if 'Name' not in df_sheet.columns or 'Number' not in df_sheet.columns:
             continue

@@ -3,6 +3,7 @@ import pandas as pd
 from pdf_parser import extraer_jugadores_pdf, extraer_info_partido
 from buscar_coincidencias import buscar_coincidencias_en_todas_pestanas
 from email_alertas import enviar_alerta_jugador
+from google_sheets import leer_todas_las_pestanas, obtener_nombres_pestanas
 from PIL import Image
 import os
 import tempfile
@@ -104,8 +105,9 @@ with st.sidebar:
     
     ### 📊 Database:
     The system searches in:
-    - `mreportsyouth.xlsx`
+    - Google Sheets (Cloud)
     - All sheets automatically
+    - Real-time data
     """)
     
     st.divider()
@@ -134,10 +136,13 @@ uploaded_file = st.file_uploader(
     help="Upload the official match lineup PDF from MySAFF system"
 )
 
-excel_path = '/Users/alvarolopezmolina/Desktop/alertasalnassr/mreportsyouth.xlsx'
-
-if not os.path.exists(excel_path):
-    st.error(f"❌ Database file not found: {excel_path}")
+try:
+    with st.spinner("🔄 Connecting to Google Sheets database..."):
+        sheet_names = obtener_nombres_pestanas()
+    st.success(f"✅ Connected to Google Sheets ({len(sheet_names)} sheets found)")
+except Exception as e:
+    st.error(f"❌ Error connecting to Google Sheets: {str(e)}")
+    st.info("💡 Make sure the service account credentials are configured in Streamlit secrets")
     st.stop()
 
 if uploaded_file is not None:
@@ -164,10 +169,11 @@ if uploaded_file is not None:
             
             st.success(f"✅ {total_jugadores} players extracted from PDF")
             
-            with st.spinner("🔍 Searching for highlighted players in database..."):
+            with st.spinner("🔍 Searching for highlighted players in Google Sheets..."):
+                sheets_data = leer_todas_las_pestanas()
                 jugadores_encontrados = buscar_coincidencias_en_todas_pestanas(
                     df_jugadores, 
-                    excel_path
+                    sheets_data
                 )
             
             if len(jugadores_encontrados) == 0:
