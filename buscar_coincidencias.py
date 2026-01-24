@@ -25,13 +25,28 @@ def normalizar_equipo(equipo):
         return ""
     equipo = str(equipo).upper().strip()
     
+    # Eliminar sufijos comunes
+    equipo = equipo.replace(' FC', '').replace(' SFC', '').replace(' CLUB', '').strip()
+    
+    # Eliminar guiones y normalizar espacios
+    equipo = equipo.replace('-', ' ')
+    equipo = re.sub(r'\s+', ' ', equipo)
+    
+    # Mapeo de variaciones comunes
     mapeo_equipos = {
-        'AL-NASSR': 'AL NASSR',
+        'AL NASSR': 'AL NASSR',
         'ALNASSR': 'AL NASSR',
-        'AL NASSR FC': 'AL NASSR',
-        'AL-ITTIHAD': 'AL ITTIHAD',
+        'AL ITTIHAD': 'AL ITTIHAD',
         'ALITTIHAD': 'AL ITTIHAD',
-        'AL ITTIHAD CLUB': 'AL ITTIHAD',
+        'AL HILAL': 'AL HILAL',
+        'ALHILAL': 'AL HILAL',
+        'AL AHLI': 'AL AHLI',
+        'ALAHLI': 'AL AHLI',
+        'AL RAED': 'AL RAED',
+        'ALRAED': 'AL RAED',
+        'AL RAYED': 'AL RAED',
+        'AL QADSIAH': 'AL QADSIAH',
+        'ALQADSIAH': 'AL QADSIAH',
     }
     
     for key, value in mapeo_equipos.items():
@@ -63,11 +78,15 @@ def buscar_jugador_en_excel(jugador_pdf, df_excel):
     dorsal_pdf = jugador_pdf['Dorsal']
     equipo_pdf = normalizar_equipo(jugador_pdf['Equipo'])
     
+    # Extraer primer nombre para comparación parcial
+    primer_nombre_pdf = nombre_pdf.split()[0] if nombre_pdf else ""
+    
     for idx, row in df_excel.iterrows():
         nombre_excel = normalizar_nombre(row.get('Name', ''))
         dorsal_excel = row.get('Number', None)
         equipo_excel = normalizar_equipo(row.get('Team', ''))
         
+        # Verificar coincidencia de dorsal
         coincide_dorsal = False
         if pd.notna(dorsal_excel):
             try:
@@ -75,10 +94,20 @@ def buscar_jugador_en_excel(jugador_pdf, df_excel):
             except:
                 pass
         
+        # Verificar coincidencia de equipo
         coincide_equipo = equipo_pdf in equipo_excel or equipo_excel in equipo_pdf
         
+        # Calcular similitud de nombre completo
         similitud = similitud_nombres(nombre_pdf, nombre_excel)
         
+        # Verificar si el nombre del PDF está contenido en el nombre del Excel
+        nombre_contenido = nombre_pdf in nombre_excel
+        
+        # Verificar si el primer nombre coincide (para casos como "FERAS" vs "FERAS SULAIMAN ALRAJHI")
+        primer_nombre_excel = nombre_excel.split()[0] if nombre_excel else ""
+        coincide_primer_nombre = primer_nombre_pdf == primer_nombre_excel if primer_nombre_pdf else False
+        
+        # CRITERIO 1: Dorsal + Equipo + Nombre similar (>70%)
         if coincide_dorsal and coincide_equipo and similitud > 0.7:
             return {
                 'encontrado': True,
@@ -89,6 +118,29 @@ def buscar_jugador_en_excel(jugador_pdf, df_excel):
                 'coincide_equipo': coincide_equipo
             }
         
+        # CRITERIO 2: Dorsal + Equipo + Primer nombre coincide (para nombres parciales)
+        if coincide_dorsal and coincide_equipo and coincide_primer_nombre:
+            return {
+                'encontrado': True,
+                'fila_excel': idx,
+                'datos_excel': row.to_dict(),
+                'similitud_nombre': similitud,
+                'coincide_dorsal': coincide_dorsal,
+                'coincide_equipo': coincide_equipo
+            }
+        
+        # CRITERIO 3: Dorsal + Equipo + Nombre contenido
+        if coincide_dorsal and coincide_equipo and nombre_contenido:
+            return {
+                'encontrado': True,
+                'fila_excel': idx,
+                'datos_excel': row.to_dict(),
+                'similitud_nombre': similitud,
+                'coincide_dorsal': coincide_dorsal,
+                'coincide_equipo': coincide_equipo
+            }
+        
+        # CRITERIO 4: Nombre muy similar (>85%) + Equipo
         elif similitud > 0.85 and coincide_equipo:
             return {
                 'encontrado': True,

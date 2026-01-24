@@ -1,0 +1,71 @@
+📦 LISTA DE ARCHIVOS PARA SUBIR A RENDER
+==========================================
+
+✅ ARCHIVOS PYTHON PRINCIPALES (9 archivos)
+--------------------------------------------
+1. app_league_checker.py
+2. check_league_players.py
+3. saff_api.py
+4. google_sheets.py
+5. buscar_coincidencias.py
+6. email_resumen_liga.py
+7. config.py
+8. requirements.txt
+9. render.yaml (opcional)
+
+✅ CARPETA DE CONFIGURACIÓN
+----------------------------
+.streamlit/
+  └── config.toml
+
+❌ NO SUBIR ESTOS ARCHIVOS
+---------------------------
+- .env (configurar como variables de entorno en Render)
+- service_account.json (configurar como variables de entorno en Render)
+- credentials.json
+- *.pdf
+- __pycache__/
+- *.pyc
+- .DS_Store
+- debug_matching.py (opcional, solo para desarrollo)
+- test_league_checker.py (opcional, solo para desarrollo)
+
+🔐 VARIABLES DE ENTORNO A CONFIGURAR EN RENDER
+-----------------------------------------------
+
+1. EMAIL_USER = tu_email@gmail.com
+2. EMAIL_PASSWORD = tu_contraseña_de_aplicacion_gmail
+
+3. Credenciales de Google (opción recomendada - variables individuales):
+   GCP_TYPE = service_account
+   GCP_PROJECT_ID = tu-project-id
+   GCP_PRIVATE_KEY_ID = tu-private-key-id
+   GCP_PRIVATE_KEY = -----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n
+   GCP_CLIENT_EMAIL = tu-service-account@tu-project.iam.gserviceaccount.com
+   GCP_CLIENT_ID = tu-client-id
+   GCP_AUTH_URI = https://accounts.google.com/o/oauth2/auth
+   GCP_TOKEN_URI = https://oauth2.googleapis.com/token
+   GCP_AUTH_PROVIDER_X509_CERT_URL = https://www.googleapis.com/oauth2/v1/certs
+   GCP_CLIENT_X509_CERT_URL = https://www.googleapis.com/robot/v1/metadata/x509/...
+
+📝 COMANDOS PARA RENDER
+-----------------------
+
+Build Command:
+pip install -r requirements.txt
+
+Start Command:
+streamlit run app_league_checker.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true
+
+Environment:
+Python 3.11
+
+🚀 PASOS RÁPIDOS
+----------------
+
+1. Sube todos los archivos de la lista "✅ ARCHIVOS PYTHON PRINCIPALES"
+2. Sube la carpeta .streamlit/ con config.toml
+3. Configura las variables de entorno en Render
+4. Despliega
+
+Para más detalles, consulta DEPLOY_RENDER.md

@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: sistema-alertas-jugadores
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app_league_checker.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASSWORD
+        sync: false
+      - key: GOOGLE_SHEETS_CREDENTIALS
+        sync: false
