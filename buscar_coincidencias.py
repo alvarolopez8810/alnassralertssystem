@@ -104,7 +104,8 @@ def buscar_jugador_en_excel(jugador_pdf, df_excel):
         nombre_contenido = nombre_pdf in nombre_excel
         
         # Verificar si el primer nombre coincide (para casos como "FERAS" vs "FERAS SULAIMAN ALRAJHI")
-        primer_nombre_excel = nombre_excel.split()[0] if nombre_excel else ""
+        nombre_excel_parts = nombre_excel.split() if nombre_excel else []
+        primer_nombre_excel = nombre_excel_parts[0] if nombre_excel_parts else ""
         coincide_primer_nombre = primer_nombre_pdf == primer_nombre_excel if primer_nombre_pdf else False
         
         # CRITERIO 1: Dorsal + Equipo + Nombre similar (>70%)
